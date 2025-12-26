@@ -1,0 +1,693 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 85b195bb42084eb69b2c8a5c23860a2b
+      name: Templates/IOT
+  templates:
+    - uuid: 6bd56cd788e24c1e94a7dfd28dbfe7fb
+      template: 'Solvis Remote by HTTP'
+      name: 'Solvis Remote by HTTP'
+      description: |
+        Template to monitor a Solvis Max/Ben Hybrid Heating System that is connected to a Solvis Remote.
+        
+        More information regarding Solvis Remote: https://www.solvis.de/solvisremote-ben-max/
+        
+        Template made by Carsten Brenner. Feel free to change and tweak it for your preferences.
+      groups:
+        - name: Templates/IOT
+      items:
+        - uuid: a2318b08488f4aedb75e3c2359176b69
+          name: 'Actor A1 (Pumpe Zirkulation)'
+          type: DEPENDENT
+          key: solvis.actor.a1
+          trends: '0'
+          status: DISABLED
+          description: 'Schaltstatus Pumpe Zirkulation'
+          valuemap:
+            name: On/Off
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.A1
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+        - uuid: 6a4ed3184e9142318a32e3c91935f696
+          name: 'Actor A3 (Pumpe Heizkreis 1)'
+          type: DEPENDENT
+          key: solvis.actor.a3
+          trends: '0'
+          description: 'Schaltstatus Pumpe Heizkreis 1'
+          valuemap:
+            name: On/Off
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.A3
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+        - uuid: 2193c35e331445e199035633eaefd211
+          name: 'Actor A4 (Pumpe Heizkreis 2)'
+          type: DEPENDENT
+          key: solvis.actor.a4
+          trends: '0'
+          status: DISABLED
+          description: 'Schaltstatus Pumpe Heizkreis 2'
+          valuemap:
+            name: On/Off
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.A4
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+        - uuid: 85a65cf8719d4dc2bf584dc48d36a44f
+          name: 'Actor A5 (Pumpe Heizkreis 3)'
+          type: DEPENDENT
+          key: solvis.actor.a5
+          trends: '0'
+          status: DISABLED
+          description: 'Schaltstatus Pumpe Heizkreis 3'
+          valuemap:
+            name: On/Off
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.A5
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+        - uuid: 7f1bf7e629624dafa084ca6cf3a7c03f
+          name: 'Actor A12 (Brenner 230V)'
+          type: DEPENDENT
+          key: solvis.actor.a12
+          trends: '0'
+          description: 'Schaltstatus Brenner (230 V ~)'
+          valuemap:
+            name: On/Off
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.A12
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+          triggers:
+            - uuid: b4a149bf435248bfa722a9735103da38
+              expression: 'last(/Solvis Remote by HTTP/solvis.actor.a12)=1'
+              name: 'Solvis: Burner active'
+              priority: INFO
+              description: 'This indicates, that right now the Oil/Gasoline Burner is active.'
+        - uuid: 955316050f7b4673bd90b67bb370d23d
+          name: 'Counter Solar Power (Solarleistung)'
+          type: DEPENDENT
+          key: solvis.counter.solarpower
+          units: kW
+          description: 'Aktuelle Heizleistung der Kollektoren'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.SolarPower
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+        - uuid: a42e774ad7a1410398a34c9ede5cba56
+          name: 'Counter Solar Revenue (Solarertrag)'
+          type: DEPENDENT
+          key: solvis.counter.solarrevenue
+          units: Wh
+          description: 'Menge an Solarertrag Gesamt'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.SolarRevenue
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+        - uuid: 51058e36f6ab4f11a8ce336b9665ff47
+          name: 'Get status'
+          type: HTTP_AGENT
+          key: solvis.get_status
+          history: 1h
+          value_type: TEXT
+          authtype: DIGEST
+          username: '{$SOLVIS.AUTH.USER}'
+          password: '{$SOLVIS.AUTH.PASSWORD}'
+          description: 'Getting data from a machine-readable version of the Solvis Remote.'
+          preprocessing:
+            - type: XMLPATH
+              parameters:
+                - /xml/data/text()
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  // Function to convert hex string to decimal considering endianness
+                  function convertHexToDec(hexString, size) {
+                      var chunkArray = [];
+                      hexString = hexString.substring(0, size);
+                  
+                      for (var i = 0; i < size / 2; i++) {
+                          var subStr = hexString.substring(0, 2);
+                          hexString = hexString.substring(2);
+                          chunkArray.push(subStr);
+                      }
+                  
+                      if (hexString.length) {
+                          chunkArray.push(hexString);
+                      }
+                  
+                      var reversedHex = "";
+                      for (var j = chunkArray.length - 1; j >= 0; j--) {
+                          reversedHex += chunkArray[j];
+                      }
+                  
+                      return parseInt(reversedHex, 16);
+                  }
+                  
+                  // As we were using XPath in a previous preprocessing step, we don't have to deal with XML structure here.
+                  // However, we have to skip certain parts of the hex string to get to the actual data.
+                  value = value.substring(12); // Skip Header (schema.html:407)
+                  value = value.substring(6);  // Skip Timestamp (schema.html:408)
+                  
+                  var result = {};
+                  var i, tempValue;
+                  
+                  //Machinetype and Systemnumber
+                  tempValue = convertHexToDec(value, 4);
+                  value = value.substring(4);
+                  result["Machinetype"] = tempValue;
+                  
+                  tempValue = convertHexToDec(value, 4);
+                  value = value.substring(4);
+                  result["Systemnumber"] = tempValue;
+                  
+                  // Temperatures (S1 bis S16)
+                  for (i = 1; i <= 16; i++) {
+                      tempValue = convertHexToDec(value, 4);
+                      value = value.substring(4);
+                  
+                      if (tempValue > 32767) {
+                          tempValue -= 65536;
+                      }
+                  
+                      result["S" + i] = (tempValue / 10).toFixed(1);
+                  }
+                  
+                  // Throughput (S18 und S17) <- Actually S18 before S17
+                  tempValue = convertHexToDec(value, 4);
+                  value = value.substring(4);
+                  result["S18"] = (tempValue / 10).toFixed(1);
+                  
+                  tempValue = convertHexToDec(value, 4);
+                  value = value.substring(4);
+                  result["S17"] = tempValue.toFixed(1);
+                  
+                  // AnalogIn (AI1 to AI3)
+                  for (i = 1; i <= 3; i++) {
+                      tempValue = convertHexToDec(value, 4);
+                      value = value.substring(4);
+                      result["AI" + i] = (tempValue / 10).toFixed(1) + "V";
+                  }
+                  
+                  // AnalogOut (P1 to P4)
+                  //for (i = 1; i <= 5; i++) {
+                  for (i = 1; i <= 4; i++) {
+                      tempValue = convertHexToDec(value, 2);
+                      value = value.substring(2);
+                      result["P" + i] = tempValue === 0 ? "0" : "1";
+                  }
+                  
+                  // RoomSensors (RF1 to RF3)
+                  for (i = 1; i <= 3; i++) {
+                      tempValue = convertHexToDec(value, 4);
+                      value = value.substring(4);
+                  
+                      if (tempValue > 32767) {
+                          tempValue -= 65536;
+                      }
+                  
+                      result["RF" + i] = (tempValue / 10).toFixed(1);
+                  }
+                  
+                  // Outputs (A1 to A14)
+                  for (i = 1; i <= 14; i++) {
+                      tempValue = convertHexToDec(value, 2);
+                      value = value.substring(2);
+                      result["A" + i] = tempValue === 0 ? "0" : "1";
+                  }
+                  
+                  // Solar specific values
+                  value = value.substring(16); // Skip 16 chars (schema.html:534)
+                  tempValue = (convertHexToDec(value, 4)) * 1000;
+                  value = value.substring(4);
+                  result["SolarRevenue"] = tempValue;
+                  
+                  value = value.substring(10); // Skip 10 chars (schema.html:545)
+                  tempValue = convertHexToDec(value, 2);
+                  value = value.substring(2);
+                  result["P5"] = tempValue === 0 ? "0" : "1";
+                  
+                  value = value.substring(18); // Skip 18 chars (schema.html:564)
+                  tempValue = convertHexToDec(value, 4);
+                  value = value.substring(4);
+                  result["SolarPower"] = (tempValue / 10).toFixed(1);
+                  
+                  // Return JSON-String (pretty print)
+                  return JSON.stringify(result, null, 2);
+          url: 'http://{HOST.IP}/sc2_val.xml'
+          tags:
+            - tag: component
+              value: raw
+        - uuid: b8ea3de634404e1299d1257e6d061893
+          name: 'Pump P5 (Pumpe Warmwasser)'
+          type: DEPENDENT
+          key: solvis.pump.p5
+          trends: '0'
+          description: 'Schaltstatus Pumpe Warmwasser'
+          valuemap:
+            name: On/Off
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.P5
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+        - uuid: c3dabda2d0e247ef9e4fb2a47fd18d97
+          name: 'Pump SP1 (Pumpe Solar Kollektor)'
+          type: DEPENDENT
+          key: solvis.pump.sp1
+          trends: '0'
+          description: 'Schaltstatus Pumpe Solar Kollektormittelrkreislauf'
+          valuemap:
+            name: On/Off
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.P1
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+        - uuid: 721a8c21b65746aaa17f322b1ccdc3a1
+          name: 'Pump SP2 (Pumpe Solar Heizwasser)'
+          type: DEPENDENT
+          key: solvis.pump.sp2
+          trends: '0'
+          description: 'Schaltstatus Pumpe Solar Heizwasserkreislauf'
+          valuemap:
+            name: On/Off
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.P2
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+        - uuid: bddcab7f4e9943af9208418dba7bbab9
+          name: 'Temperature RF1'
+          type: DEPENDENT
+          key: solvis.sensor.rf1
+          value_type: FLOAT
+          status: DISABLED
+          units: °C
+          description: 'Temperatur Raumfühler 1'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.RF1
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: 3cbc96ce52af49fa93e5a5fc08c3cd33
+          name: 'Temperature RF2'
+          type: DEPENDENT
+          key: solvis.sensor.rf2
+          value_type: FLOAT
+          status: DISABLED
+          units: °C
+          description: 'Temperatur Raumfühler 2'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.RF2
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: 2eea71c8a8a2457996a918d947f8054a
+          name: 'Temperature RF3'
+          type: DEPENDENT
+          key: solvis.sensor.rf3
+          value_type: FLOAT
+          status: DISABLED
+          units: °C
+          description: 'Temperatur Raumfühler 3'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.RF3
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: 500d3f3b57184d1585dd180480016ba8
+          name: 'Temperature S1 (Speicher oben)'
+          type: DEPENDENT
+          key: solvis.sensor.s1
+          value_type: FLOAT
+          units: °C
+          description: 'Temperatur Heizwasserspeicher oben (Entnahme)'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S1
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: 5a1601c2b3e34312827c580fa6933c06
+          name: 'Temperature S2 (Warmwasser)'
+          type: DEPENDENT
+          key: solvis.sensor.s2
+          value_type: FLOAT
+          units: °C
+          description: 'Temperatur Warmwasser'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S2
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: 27652a354215414994e85b49f0f26551
+          name: 'Temperature S3 (Speicherreferenz)'
+          type: DEPENDENT
+          key: solvis.sensor.s3
+          value_type: FLOAT
+          units: °C
+          description: 'Temperatur Heizwasserspeicher unten (Zufuhr Solar, Rückfuhr Heizkreislauf)'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S3
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: 2f258797b1b44fbea9cd9e7e0b78aee2
+          name: 'Temperature S4 (Heizungspuffer oben)'
+          type: DEPENDENT
+          key: solvis.sensor.s4
+          value_type: FLOAT
+          units: °C
+          description: 'Temperatur Heizungspuffer oben'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S4
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: ed2438a7c71a4de28cad1cd175bbd955
+          name: 'Temperature S5 (Wärmetauscher Solar Rücklauf)'
+          type: DEPENDENT
+          key: solvis.sensor.s5
+          value_type: FLOAT
+          units: °C
+          description: 'Temperatur Wärmetauscher Solar Rücklauf'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S5
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: 3278386c8ec34d0a917e569cbc3efc6d
+          name: 'Temperature S6 (Wärmetauscher Solar Zulauf)'
+          type: DEPENDENT
+          key: solvis.sensor.s6
+          value_type: FLOAT
+          units: °C
+          description: 'Temperatur Wärmetauscher Solar Zulauf'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S6
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: d661138efcbe4761bd09e7d556489b71
+          name: 'Temperature S7 (Solarplatten Rücklauf)'
+          type: DEPENDENT
+          key: solvis.sensor.s7
+          value_type: FLOAT
+          units: °C
+          description: 'Temperatur Solarplatten Rücklauf'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S7
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: b8b1b05b2eec4f649033a2dff21f148c
+          name: 'Temperature S8 (Solarplatten)'
+          type: DEPENDENT
+          key: solvis.sensor.s8
+          value_type: FLOAT
+          units: °C
+          description: 'Temperatur Solarplatten'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S8
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: a04940905ee54414ac4da8885e81628f
+          name: 'Temperature S9 (Heizungspuffer unten/Kondensatüberwachung)'
+          type: DEPENDENT
+          key: solvis.sensor.s9
+          value_type: FLOAT
+          status: DISABLED
+          units: °C
+          description: 'Temperatur S9'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S9
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: 4e89d009569e42dc9574854d75747e71
+          name: 'Temperature S10 (Außenfühler)'
+          type: DEPENDENT
+          key: solvis.sensor.s10
+          value_type: FLOAT
+          units: °C
+          description: 'Temperatur Außenfühler'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S10
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: f426405182f940c591e8bc651d1176bd
+          name: 'Temperature S12 (Heizkreis 1)'
+          type: DEPENDENT
+          key: solvis.sensor.s12
+          value_type: FLOAT
+          units: °C
+          description: 'Temperatur Heizkreis 1'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S12
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: f809df095acf4aec8e0c61790dd78324
+          name: 'Temperature S13 (Heizkreis 2)'
+          type: DEPENDENT
+          key: solvis.sensor.s13
+          value_type: FLOAT
+          status: DISABLED
+          units: °C
+          description: 'Temperatur Heizkreis 2'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S13
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: ae8937a4e30142b985e8e4e950f811df
+          name: 'Temperature S15 (Warmwasser-Wärmetauscher Frischwasserzulauf)'
+          type: DEPENDENT
+          key: solvis.sensor.s15
+          value_type: FLOAT
+          units: °C
+          description: 'Temperatur Warmwasser-Wärmetauscher Frischwasserzulauf'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S15
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: 625b468fe72b43e895604e57fc60613f
+          name: 'Temperature S16 (Heizkreis 3)'
+          type: DEPENDENT
+          key: solvis.sensor.s16
+          value_type: FLOAT
+          status: DISABLED
+          units: °C
+          description: 'Temperatur Heizkreis 3'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S16
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+            - tag: component
+              value: temperature
+        - uuid: 006f4d9478a34d1982ee8a037841975e
+          name: 'Throughput S17 (Wärmetauscher Solar)'
+          type: DEPENDENT
+          key: solvis.sensor.s17
+          value_type: FLOAT
+          units: L/h
+          description: 'Durchfluss Heizwasser in Wärmetauscher Solar'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S17
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+        - uuid: a6bb222dc6c642d4bda7326efab3c012
+          name: 'Throughput S18 (Frischwasserzulauf Warmwasser-Wärmetauscher)'
+          type: DEPENDENT
+          key: solvis.sensor.s18
+          value_type: FLOAT
+          units: L/min
+          description: 'Durchfluss Frischwasserzulauf Warmwasser-Wärmetauscher'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.S18
+          master_item:
+            key: solvis.get_status
+          tags:
+            - tag: component
+              value: sensor
+      tags:
+        - tag: class
+          value: iot
+        - tag: target
+          value: solvis
+        - tag: target
+          value: solvis-remote
+      macros:
+        - macro: '{$SOLVIS.AUTH.PASSWORD}'
+          value: solvis
+          description: 'Passwort für Solvis Remote'
+        - macro: '{$SOLVIS.AUTH.USER}'
+          value: solvis
+          description: 'Benutzername für Solvis Remote'
+      valuemaps:
+        - uuid: e59e989e6c914ffe9c1ba8690d65b4c5
+          name: On/Off
+          mappings:
+            - value: '0'
+              newvalue: 'off'
+            - value: '1'
+              newvalue: 'on'
