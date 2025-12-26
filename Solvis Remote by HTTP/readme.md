@@ -20,4 +20,5 @@ HHHHHHHHHHHH TTTTTT MMMM SSSS 7902 7701 9801 3402 2E02 8201 9302 6F02 A2FE 0F00 
 >  Header    >Time  >M   >S   >S1  >S2  >S3  >S4  >S5  >S6  >S7  >S8  >S9  >S10 >S11 >S12 >S13 >S14 >S15 >S16 >S18 >S17 >AI1 >AI2 >AI3 >P1 >P2 >P3 >P4 >RF1 >RF2 >RF3 >A1 >A2 >A3 >A4 >A5 >A6 >A7 >A8 >A9 >A10 >A11 >A12 >A13 >A14 >16Chars skip    >Solarertrag >10C skip  >P5 >18Chars skip      >Solarleistung
 ```
 ## Conversion Script
-The attached script is not required to run the template. Instead it's embedded in the preprocessing of the raw item `solvis.get_status`. 
+The attached script ([conversion-script.js](conversion-script.js)) is not required to run the template. Instead it's embedded in the preprocessing of the raw item `solvis.get_status`. 
+I've only added it for readability purposes and easier editing on my own.
